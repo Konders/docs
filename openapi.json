@@ -1,0 +1,1013 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Exchange Partner API",
+    "version": "1.0.0",
+    "description": "REST API for exchange office partners. Authenticate with a Bearer API key (`sk_branch_*` or `sk_personal_*`). API key management endpoints use JWT Bearer auth from the staff panel."
+  },
+  "servers": [
+    {
+      "url": "https://api.example.com/api/v1",
+      "description": "Production"
+    }
+  ],
+  "security": [
+    { "bearerAuth": [] }
+  ],
+  "tags": [
+    { "name": "Partner — Exchanges", "description": "Read public exchange office data and rates" },
+    { "name": "Partner — Offers", "description": "Browse available currency exchange rate offers" },
+    { "name": "Partner — Orders", "description": "Create and manage client exchange orders" },
+    { "name": "Partner — Clients", "description": "Register and manage client accounts" },
+    { "name": "Partner — Webhooks", "description": "Manage webhook endpoint registrations" },
+    { "name": "API Keys", "description": "Create and revoke partner API keys (JWT auth required)" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Partner API key. Format: `sk_branch_<32chars>` or `sk_personal_<32chars>`"
+      },
+      "jwtAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Staff panel JWT access token"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "statusCode": { "type": "integer", "example": 400 },
+          "message": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ],
+            "example": "Validation failed"
+          },
+          "error": { "type": "string", "example": "Bad Request" }
+        },
+        "required": ["statusCode", "message"]
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer", "description": "Total number of records", "example": 120 },
+          "skip": { "type": "integer", "description": "Number of records skipped", "example": 0 },
+          "limit": { "type": "integer", "description": "Page size", "example": 25 }
+        }
+      },
+      "EntityRef": {
+        "type": "object",
+        "description": "A reference to another entity, identified by numeric ID",
+        "properties": {
+          "id": { "type": "integer", "example": 1 }
+        },
+        "required": ["id"]
+      },
+      "Exchange": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "name": { "type": "string", "example": "Main Office" },
+          "address": { "type": "string", "example": "123 Currency St" },
+          "city": { "type": "string", "example": "Kyiv" },
+          "isActive": { "type": "boolean", "example": true },
+          "schedule": { "type": "object", "description": "Operating hours by day of week" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Offer": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 42 },
+          "currency1": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer", "example": 1 },
+              "code": { "type": "string", "example": "USD" },
+              "name": { "type": "string", "example": "US Dollar" }
+            }
+          },
+          "currency2": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer", "example": 2 },
+              "code": { "type": "string", "example": "UAH" },
+              "name": { "type": "string", "example": "Ukrainian Hryvnia" }
+            }
+          },
+          "rate": { "type": "number", "format": "float", "example": 41.5 },
+          "minAmount": { "type": "number", "example": 100 },
+          "maxAmount": { "type": "number", "example": 50000 },
+          "isActive": { "type": "boolean", "example": true },
+          "exchange": { "$ref": "#/components/schemas/EntityRef" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1001 },
+          "hashedId": { "type": "string", "example": "a3f7b2c1d4e5" },
+          "status": {
+            "type": "string",
+            "enum": ["ORDERINIT", "CLIENTPAYMENTWAIT", "EXCHANGEPAYMENTWAIT", "CASHOUT", "SUCCESS", "CANCEL"],
+            "example": "CLIENTPAYMENTWAIT"
+          },
+          "clientAmount": { "type": "number", "example": 1000 },
+          "exchangeAmount": { "type": "number", "example": 41500 },
+          "currency1": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer" },
+              "code": { "type": "string", "example": "USD" }
+            }
+          },
+          "currency2": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer" },
+              "code": { "type": "string", "example": "UAH" }
+            }
+          },
+          "cashbox": { "$ref": "#/components/schemas/EntityRef" },
+          "user": { "$ref": "#/components/schemas/EntityRef" },
+          "comment": { "type": "string", "nullable": true },
+          "clientComment": { "type": "string", "nullable": true },
+          "operationType": { "type": "string", "enum": ["offer", "finop"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateOrderRequest": {
+        "type": "object",
+        "required": ["cashbox", "currency1", "currency2", "operationType"],
+        "properties": {
+          "cashbox": {
+            "$ref": "#/components/schemas/EntityRef",
+            "description": "The cashbox (exchange point) to process the order"
+          },
+          "currency1": {
+            "$ref": "#/components/schemas/EntityRef",
+            "description": "Source currency"
+          },
+          "currency2": {
+            "$ref": "#/components/schemas/EntityRef",
+            "description": "Destination currency"
+          },
+          "operationType": {
+            "type": "string",
+            "enum": ["offer", "finop"],
+            "example": "offer"
+          },
+          "clientAmount": {
+            "type": "number",
+            "description": "Amount the client provides",
+            "example": 1000
+          },
+          "exchangeAmount": {
+            "type": "number",
+            "description": "Amount the exchange provides",
+            "example": 41500
+          },
+          "paymentMethodSource": {
+            "$ref": "#/components/schemas/EntityRef",
+            "description": "Payment method for receiving from client"
+          },
+          "paymentMethodDest": {
+            "$ref": "#/components/schemas/EntityRef",
+            "description": "Payment method for sending to client"
+          },
+          "user": {
+            "$ref": "#/components/schemas/EntityRef",
+            "description": "Client user reference"
+          },
+          "comment": { "type": "string", "example": "Internal note" },
+          "clientComment": { "type": "string", "example": "Client note" },
+          "userWallet": { "type": "string", "example": "43588345943" },
+          "tgNickName": { "type": "string", "example": "@tgnamenew" }
+        }
+      },
+      "Client": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 55 },
+          "firstName": { "type": "string", "example": "John" },
+          "lastName": { "type": "string", "example": "Doe" },
+          "email": { "type": "string", "format": "email", "example": "john@example.com" },
+          "phone": { "type": "string", "example": "+380671234567" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateClientRequest": {
+        "type": "object",
+        "properties": {
+          "firstName": { "type": "string", "example": "John" },
+          "lastName": { "type": "string", "example": "Doe" },
+          "email": { "type": "string", "format": "email", "example": "john@example.com" },
+          "phone": { "type": "string", "example": "+380671234567" },
+          "password": { "type": "string", "example": "secret123" }
+        }
+      },
+      "UpdateClientRequest": {
+        "type": "object",
+        "properties": {
+          "firstName": { "type": "string", "example": "Jane" },
+          "lastName": { "type": "string", "example": "Doe" },
+          "email": { "type": "string", "format": "email" },
+          "phone": { "type": "string" }
+        }
+      },
+      "Webhook": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid", "example": "550e8400-e29b-41d4-a716-446655440000" },
+          "url": { "type": "string", "format": "uri", "example": "https://example.com/webhooks/exchange" },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["order.created", "order.status_changed", "order.cancelled", "offer.updated"]
+            },
+            "example": ["order.created", "order.status_changed"]
+          },
+          "isActive": { "type": "boolean", "example": true },
+          "failCount": { "type": "integer", "example": 0 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateWebhookRequest": {
+        "type": "object",
+        "required": ["url", "events"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://example.com/webhooks/exchange"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["order.created", "order.status_changed", "order.cancelled", "offer.updated"]
+            },
+            "minItems": 1,
+            "example": ["order.created", "order.status_changed"]
+          }
+        }
+      },
+      "CreateWebhookResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Webhook" },
+          {
+            "type": "object",
+            "properties": {
+              "secretKey": {
+                "type": "string",
+                "description": "HMAC-SHA256 signing secret. Shown only once — store securely.",
+                "example": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+              },
+              "note": {
+                "type": "string",
+                "example": "Store this secret key securely — it will not be shown again. Use it to verify HMAC-SHA256 signatures."
+              }
+            }
+          }
+        ]
+      },
+      "ApiKey": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "example": "My CRM Integration" },
+          "type": { "type": "string", "enum": ["branch", "personal"] },
+          "keyPrefix": { "type": "string", "example": "sk_personal_Ab3x", "description": "First 16 chars of the key, for display" },
+          "isActive": { "type": "boolean", "example": true },
+          "lastUsedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "expiresAt": { "type": "string", "format": "date-time", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateApiKeyRequest": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "name": { "type": "string", "maxLength": 100, "example": "My CRM Integration" },
+          "type": { "type": "string", "enum": ["branch", "personal"], "default": "personal" },
+          "branchId": {
+            "type": "integer",
+            "description": "Required when type=branch",
+            "example": 1
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 expiry date. Omit for no expiry.",
+            "example": "2027-01-01T00:00:00Z"
+          }
+        }
+      },
+      "CreateApiKeyResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ApiKey" },
+          {
+            "type": "object",
+            "properties": {
+              "rawKey": {
+                "type": "string",
+                "description": "The full API key. Shown only once — store securely.",
+                "example": "sk_personal_Ab3xYz7qR2mN9kLpW4vC8dE1fT6uS0hJ"
+              },
+              "note": {
+                "type": "string",
+                "example": "Store this key securely — it will not be shown again."
+              }
+            }
+          }
+        ]
+      },
+      "UpdateApiKeyRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "maxLength": 100, "example": "Renamed key" },
+          "isActive": { "type": "boolean", "example": false }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing or invalid API key",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "statusCode": 401, "message": "Unauthorized" }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "API key does not have permission to access this resource",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "statusCode": 403, "message": "Forbidden" }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "statusCode": 404, "message": "Not Found" }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Rate limit exceeded (60 req/min per API key)",
+        "headers": {
+          "Retry-After": {
+            "schema": { "type": "integer" },
+            "description": "Seconds until the rate limit window resets"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "statusCode": 429, "message": "Too Many Requests" }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Request body or parameters failed validation",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": {
+              "statusCode": 400,
+              "message": ["url must be a URL address", "events should not be empty"],
+              "error": "Bad Request"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/partner/exchanges": {
+      "get": {
+        "tags": ["Partner — Exchanges"],
+        "summary": "List all public exchange offices",
+        "description": "Returns all exchange offices accessible by the API key, including their schedules and public metadata.",
+        "operationId": "partnerListExchanges",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of exchange offices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Exchange" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/partner/exchanges/{id}": {
+      "get": {
+        "tags": ["Partner — Exchanges"],
+        "summary": "Get a single exchange office",
+        "description": "Returns full public data for a specific exchange office by its numeric ID.",
+        "operationId": "partnerGetExchange",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "Exchange office ID",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exchange office details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Exchange" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/partner/offers": {
+      "get": {
+        "tags": ["Partner — Offers"],
+        "summary": "List available exchange rate offers",
+        "description": "Returns paginated exchange rate offers (currency pairs and rates) available to clients.",
+        "operationId": "partnerListOffers",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "schema": { "type": "integer", "default": 0 },
+            "description": "Number of records to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "default": 25, "maximum": 100 },
+            "description": "Maximum number of records to return"
+          },
+          {
+            "name": "filters",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "JSON-encoded filter object. Example: `{\"isActive\":true}`"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "JSON-encoded sort array. Example: `[[\"rate\",\"ASC\"]]`"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of offers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Offer" }
+                    },
+                    "meta": { "$ref": "#/components/schemas/PaginationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/partner/orders": {
+      "post": {
+        "tags": ["Partner — Orders"],
+        "summary": "Create a new exchange order",
+        "description": "Creates a client exchange order. The order is scoped to the exchanges accessible by the API key. Status begins at `ORDERINIT`.",
+        "operationId": "partnerCreateOrder",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateOrderRequest" },
+              "example": {
+                "cashbox": { "id": 1 },
+                "currency1": { "id": 1 },
+                "currency2": { "id": 2 },
+                "operationType": "offer",
+                "clientAmount": 1000
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order created successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Order" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      },
+      "get": {
+        "tags": ["Partner — Orders"],
+        "summary": "List orders for the authenticated client",
+        "description": "Returns a paginated list of orders associated with the API key's user scope.",
+        "operationId": "partnerListOrders",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "schema": { "type": "integer", "default": 0 },
+            "description": "Number of records to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "default": 25, "maximum": 100 },
+            "description": "Maximum number of records to return (capped at 100)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of orders",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Order" }
+                    },
+                    "meta": { "$ref": "#/components/schemas/PaginationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/partner/orders/view/{hashedId}": {
+      "get": {
+        "tags": ["Partner — Orders"],
+        "summary": "Get order by public hash ID",
+        "description": "Retrieves a public order view by its hashed ID. Useful for sharing order status with clients via a link without exposing the internal numeric ID.",
+        "operationId": "partnerViewOrderByHash",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "hashedId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The public hashed order identifier",
+            "example": "a3f7b2c1d4e5"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Order" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/partner/orders/{id}": {
+      "get": {
+        "tags": ["Partner — Orders"],
+        "summary": "Get order details by ID",
+        "description": "Returns full details for a specific order. The order must belong to the API key's user scope.",
+        "operationId": "partnerGetOrder",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "Order ID",
+            "example": 1001
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Order" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/partner/orders/{id}/cancel": {
+      "post": {
+        "tags": ["Partner — Orders"],
+        "summary": "Cancel an order",
+        "description": "Cancels an order that is in a cancellable state (`ORDERINIT` or `CLIENTPAYMENTWAIT`). The order must belong to the API key's user scope.",
+        "operationId": "partnerCancelOrder",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "Order ID to cancel",
+            "example": 1001
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order cancelled successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Order" }
+              }
+            }
+          },
+          "400": {
+            "description": "Order cannot be cancelled in its current state",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "statusCode": 400, "message": "Order cannot be cancelled" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/partner/clients": {
+      "post": {
+        "tags": ["Partner — Clients"],
+        "summary": "Register a new client",
+        "description": "Creates a new client user account. The client is associated with the API key's exchange scope.",
+        "operationId": "partnerCreateClient",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateClientRequest" },
+              "example": {
+                "firstName": "John",
+                "lastName": "Doe",
+                "email": "john@example.com",
+                "phone": "+380671234567"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Client created successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Client" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/partner/clients/{id}": {
+      "get": {
+        "tags": ["Partner — Clients"],
+        "summary": "Get a client by ID",
+        "description": "Returns client profile information for the given user ID.",
+        "operationId": "partnerGetClient",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "Client user ID",
+            "example": 55
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Client profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Client" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      },
+      "patch": {
+        "tags": ["Partner — Clients"],
+        "summary": "Update client profile",
+        "description": "Partially updates a client's profile fields. Only provided fields are updated.",
+        "operationId": "partnerUpdateClient",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "Client user ID",
+            "example": 55
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateClientRequest" },
+              "example": { "firstName": "Jane" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated client profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Client" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/partner/webhooks": {
+      "post": {
+        "tags": ["Partner — Webhooks"],
+        "summary": "Register a webhook endpoint",
+        "description": "Registers a new webhook endpoint. The response includes the `secretKey` for HMAC-SHA256 signature verification — **it is shown only once**. Store it securely.",
+        "operationId": "partnerCreateWebhook",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateWebhookRequest" },
+              "example": {
+                "url": "https://example.com/webhooks/exchange",
+                "events": ["order.created", "order.status_changed"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook registered. The `secretKey` field is shown only in this response.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreateWebhookResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      },
+      "get": {
+        "tags": ["Partner — Webhooks"],
+        "summary": "List webhook endpoints",
+        "description": "Returns all webhook endpoints registered for the authenticated API key's user scope. The `secretKey` is **not** returned in list responses.",
+        "operationId": "partnerListWebhooks",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of webhook endpoints",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Webhook" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/partner/webhooks/{id}": {
+      "delete": {
+        "tags": ["Partner — Webhooks"],
+        "summary": "Delete a webhook endpoint",
+        "description": "Permanently removes a webhook endpoint. Pending deliveries for this webhook will be abandoned.",
+        "operationId": "partnerDeleteWebhook",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "Webhook UUID",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "responses": {
+          "204": { "description": "Webhook deleted successfully" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/api-keys": {
+      "post": {
+        "tags": ["API Keys"],
+        "summary": "Create a new API key",
+        "description": "Creates a new partner API key. The response includes the `rawKey` — **it is shown only once**. Store it securely. Requires staff JWT authentication.",
+        "operationId": "createApiKey",
+        "security": [{ "jwtAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateApiKeyRequest" },
+              "example": {
+                "name": "My CRM Integration",
+                "type": "personal"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "API key created. The `rawKey` field is shown only in this response.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreateApiKeyResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "get": {
+        "tags": ["API Keys"],
+        "summary": "List your API keys",
+        "description": "Returns all API keys owned by the authenticated staff user. The raw key value is never returned — only the prefix and metadata.",
+        "operationId": "listApiKeys",
+        "security": [{ "jwtAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of API keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiKey" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api-keys/{id}": {
+      "patch": {
+        "tags": ["API Keys"],
+        "summary": "Rename or toggle an API key",
+        "description": "Updates the name or `isActive` status of an API key. Deactivating a key (`isActive: false`) immediately rejects all requests authenticated with it.",
+        "operationId": "updateApiKey",
+        "security": [{ "jwtAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "API key UUID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateApiKeyRequest" },
+              "example": { "isActive": false }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated API key",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiKey" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["API Keys"],
+        "summary": "Revoke an API key",
+        "description": "Permanently revokes an API key. All requests using this key will immediately receive 401. This action cannot be undone.",
+        "operationId": "revokeApiKey",
+        "security": [{ "jwtAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "API key UUID"
+          }
+        ],
+        "responses": {
+          "204": { "description": "API key revoked successfully" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    }
+  }
+}
