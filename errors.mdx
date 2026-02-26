@@ -1,0 +1,90 @@
+---
+title: Error Reference
+description: Standard error format and HTTP status codes returned by the Partner API.
+---
+
+## Error Format
+
+All errors return a consistent JSON body:
+
+```json
+{
+  "statusCode": 400,
+  "message": "branchId is required for branch type keys",
+  "errors": {
+    "branchId": "required"
+  }
+}
+```
+
+For validation errors, `errors` is an object mapping field names to error codes. For single-message errors, only `message` is present.
+
+## HTTP Status Codes
+
+| Code | Meaning | Common Causes |
+|------|---------|---------------|
+| `200` | OK | Successful GET / PATCH |
+| `201` | Created | Successful POST |
+| `204` | No Content | Successful DELETE |
+| `400` | Bad Request | Missing required fields, invalid values |
+| `401` | Unauthorized | Missing, invalid, expired, or revoked API key |
+| `403` | Forbidden | Valid key, but insufficient permissions |
+| `404` | Not Found | Resource doesn't exist or is not in your scope |
+| `422` | Unprocessable Entity | Business rule violation (e.g., order can't be cancelled in current status) |
+| `429` | Too Many Requests | Rate limit exceeded — see [Rate Limits](/rate-limits) |
+| `500` | Internal Server Error | Unexpected server error |
+
+## Common Error Examples
+
+### Invalid API key
+
+```json
+{
+  "statusCode": 401,
+  "message": "Invalid or revoked API key"
+}
+```
+
+### Expired API key
+
+```json
+{
+  "statusCode": 401,
+  "message": "API key has expired"
+}
+```
+
+### Rate limit exceeded
+
+```json
+{
+  "statusCode": 429,
+  "message": "Rate limit exceeded",
+  "retryAfter": 23
+}
+```
+
+### Validation error
+
+```json
+{
+  "statusCode": 400,
+  "message": ["url must be a URL address", "events should not be empty"],
+  "error": "Bad Request"
+}
+```
+
+### Resource not found
+
+```json
+{
+  "statusCode": 404,
+  "errors": {
+    "order": "notFound"
+  }
+}
+```
+
+## Idempotency
+
+The Partner API does not currently support idempotency keys. To avoid duplicate orders, check for existing orders before creating a new one using `GET /partner/orders`.

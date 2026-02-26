@@ -1,0 +1,164 @@
+---
+title: Webhooks
+description: Receive real-time notifications when orders and offers change.
+---
+
+## Overview
+
+Webhooks deliver HTTP POST requests to your endpoint whenever subscribed events occur. Each delivery is signed with HMAC-SHA256 so you can verify it came from the platform.
+
+## Supported Events
+
+| Event | Trigger |
+|-------|---------|
+| `order.created` | A new order is placed by a client |
+| `order.status_changed` | An order's status changes (any transition) |
+| `order.cancelled` | An order is cancelled |
+| `offer.updated` | An exchange rate offer is updated |
+
+## Registering a Webhook
+
+```bash
+curl -X POST https://api.example.com/api/v1/partner/webhooks \
+  -H "Authorization: Bearer sk_personal_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-app.com/hooks/exchange",
+    "events": ["order.created", "order.status_changed"]
+  }'
+```
+
+Response (secret shown once):
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "url": "https://your-app.com/hooks/exchange",
+  "events": ["order.created", "order.status_changed"],
+  "isActive": true,
+  "secretKey": "a1b2c3d4...",
+  "note": "Store this secret key securely — it will not be shown again."
+}
+```
+
+<Warning>
+  Save `secretKey` immediately. Use it to verify HMAC-SHA256 signatures.
+</Warning>
+
+## Verifying Signatures
+
+Every delivery includes:
+
+```
+X-Webhook-Signature: sha256=<hmac>
+X-Webhook-Event: order.created
+X-Webhook-Delivery: <job-id>
+```
+
+Verify the signature before processing:
+
+```typescript
+import * as crypto from 'crypto';
+
+function verifySignature(rawBody: string, secret: string, signature: string): boolean {
+  const expected = `sha256=${crypto
+    .createHmac('sha256', secret)
+    .update(rawBody)
+    .digest('hex')}`;
+  return crypto.timingSafeEqual(
+    Buffer.from(expected),
+    Buffer.from(signature),
+  );
+}
+
+// Express example
+app.post('/hooks/exchange', (req, res) => {
+  const sig = req.headers['x-webhook-signature'] as string;
+  const rawBody = JSON.stringify(req.body);
+
+  if (!verifySignature(rawBody, process.env.WEBHOOK_SECRET!, sig)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  // Process event
+  const { event, data } = req.body;
+  console.log(`Received ${event}:`, data);
+  res.status(200).send('OK');
+});
+```
+
+## Payload Structure
+
+All events share this envelope:
+
+```json
+{
+  "event": "order.created",
+  "timestamp": "2026-02-26T12:00:00.000Z",
+  "data": { /* event-specific object */ }
+}
+```
+
+### `order.created`
+
+```json
+{
+  "event": "order.created",
+  "timestamp": "2026-02-26T12:00:00.000Z",
+  "data": {
+    "id": 1234,
+    "status": "ORDERINIT",
+    "amountSource": "1000",
+    "amountDest": "26.5"
+  }
+}
+```
+
+### `order.status_changed`
+
+```json
+{
+  "event": "order.status_changed",
+  "timestamp": "2026-02-26T12:05:00.000Z",
+  "data": { "id": 1234, "status": "CLIENTPAYMENTWAIT" },
+  "status": "CLIENTPAYMENTWAIT"
+}
+```
+
+### `order.cancelled`
+
+```json
+{
+  "event": "order.cancelled",
+  "timestamp": "2026-02-26T12:10:00.000Z",
+  "data": { "id": 1234, "status": "CANCEL" }
+}
+```
+
+## Retry Policy
+
+If your endpoint returns a non-2xx status or times out, the platform retries up to **5 times** with exponential backoff:
+
+| Attempt | Delay |
+|---------|-------|
+| 1 | 5 seconds |
+| 2 | 10 seconds |
+| 3 | 20 seconds |
+| 4 | 40 seconds |
+| 5 | 80 seconds |
+
+After 10 consecutive failures, the webhook is **automatically deactivated** to protect your endpoint. You can reactivate it via the dashboard or API.
+
+## Testing Webhooks Locally
+
+Use a tunnel tool to expose your local server:
+
+```bash
+# Using ngrok
+ngrok http 3001
+
+# Register the tunnel URL as your webhook
+curl -X POST https://api.example.com/api/v1/partner/webhooks \
+  -H "Authorization: Bearer sk_personal_YOUR_KEY" \
+  -d '{"url":"https://abc123.ngrok.io/hooks","events":["order.created"]}'
+```

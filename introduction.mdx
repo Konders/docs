@@ -1,0 +1,53 @@
+---
+title: Introduction
+description: Integrate live exchange rates, order management, and client flows directly into your CRM, Telegram bot, or marketing platform.
+---
+
+## What is the Partner API?
+
+The Partner API gives enterprise exchange clients programmatic access to the exchange platform. Instead of using the staff panel manually, your systems can:
+
+- Pull live exchange rates and office info
+- Create and track client exchange orders
+- Register and manage clients
+- Receive real-time event notifications via webhooks
+
+## Use Cases
+
+| Use Case | Endpoints |
+|----------|-----------|
+| Embed live rates in your website | `GET /partner/exchanges`, `GET /partner/offers` |
+| Create orders from your Telegram bot | `POST /partner/orders` |
+| Check order status in your CRM | `GET /partner/orders/:id` |
+| Register clients without manual panel work | `POST /partner/clients` |
+| React to order events in real time | Webhooks |
+
+## Quickstart
+
+<Steps>
+  <Step title="Get an API key">
+    Log in to the staff panel, navigate to **Settings → API Keys**, and create a new key. Copy the raw key — it's shown only once.
+  </Step>
+  <Step title="Make your first request">
+    ```bash
+    curl https://api.example.com/api/v1/partner/exchanges \
+      -H "Authorization: Bearer sk_personal_YOUR_KEY"
+    ```
+  </Step>
+  <Step title="Register a webhook (optional)">
+    ```bash
+    curl -X POST https://api.example.com/api/v1/partner/webhooks \
+      -H "Authorization: Bearer sk_personal_YOUR_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"url":"https://your-app.com/hooks","events":["order.created"]}'
+    ```
+  </Step>
+</Steps>
+
+## Base URL
+
+```
+https://api.example.com/api/v1
+```
+
+All partner endpoints are prefixed with `/partner/`.

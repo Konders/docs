@@ -1,0 +1,67 @@
+---
+title: Webhooks API
+description: Register and manage webhook endpoints.
+---
+
+## Register Webhook
+
+```bash
+POST /api/v1/partner/webhooks
+Authorization: Bearer sk_personal_YOUR_KEY
+Content-Type: application/json
+```
+
+### Request Body
+
+```json
+{
+  "url": "https://your-app.com/hooks/exchange",
+  "events": ["order.created", "order.status_changed"]
+}
+```
+
+### Supported Events
+
+| Value | Description |
+|-------|-------------|
+| `order.created` | New order placed |
+| `order.status_changed` | Order status transition |
+| `order.cancelled` | Order cancelled |
+| `offer.updated` | Rate offer updated |
+
+### Response
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "url": "https://your-app.com/hooks/exchange",
+  "events": ["order.created", "order.status_changed"],
+  "isActive": true,
+  "secretKey": "a1b2c3d4e5f6...",
+  "note": "Store this secret key securely — it will not be shown again."
+}
+```
+
+<Warning>Save `secretKey` immediately. See [Webhooks](/webhooks) for how to use it for signature verification.</Warning>
+
+---
+
+## List Webhooks
+
+```bash
+GET /api/v1/partner/webhooks
+Authorization: Bearer sk_personal_YOUR_KEY
+```
+
+Returns all webhook registrations for the current API key. Secret keys are **not** included in list responses.
+
+---
+
+## Delete Webhook
+
+```bash
+DELETE /api/v1/partner/webhooks/:id
+Authorization: Bearer sk_personal_YOUR_KEY
+```
+
+Returns `204 No Content` on success. Returns `404` if not found or `403` if not owned by the caller.

@@ -1,0 +1,96 @@
+---
+title: Orders
+description: Create and manage currency exchange orders.
+---
+
+## Order Lifecycle
+
+```
+ORDERINIT → CLIENTPAYMENTWAIT → EXCHANGEPAYMENTWAIT → CASHOUT → SUCCESS
+                                                              ↘ CANCEL
+```
+
+---
+
+## Create Order
+
+```bash
+POST /api/v1/partner/orders
+Authorization: Bearer sk_personal_YOUR_KEY
+Content-Type: application/json
+```
+
+### Request Body
+
+```json
+{
+  "offer": { "id": 42 },
+  "amountSource": "1000",
+  "paymentMethod": { "id": 3 },
+  "cashbox": { "id": 1 }
+}
+```
+
+### Response
+
+Returns the created order object with status `ORDERINIT`.
+
+---
+
+## List Orders
+
+```bash
+GET /api/v1/partner/orders
+Authorization: Bearer sk_personal_YOUR_KEY
+```
+
+### Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `skip` | integer | 0 | Number of records to skip |
+| `limit` | integer | 25 | Max 100 |
+
+### Response
+
+```json
+{
+  "data": [...],
+  "total": 150,
+  "skip": 0,
+  "limit": 25
+}
+```
+
+---
+
+## Get Order by ID
+
+```bash
+GET /api/v1/partner/orders/:id
+Authorization: Bearer sk_personal_YOUR_KEY
+```
+
+Returns `404` if the order doesn't exist or doesn't belong to the authenticated client.
+
+---
+
+## Get Order by Public Hash
+
+No authentication required beyond the API key. Useful for sharing a status link.
+
+```bash
+GET /api/v1/partner/orders/view/:hashedId
+Authorization: Bearer sk_personal_YOUR_KEY
+```
+
+---
+
+## Cancel Order
+
+```bash
+POST /api/v1/partner/orders/:id/cancel
+Authorization: Bearer sk_personal_YOUR_KEY
+```
+
+Returns `422` if the order cannot be cancelled in its current status.

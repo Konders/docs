@@ -1,0 +1,78 @@
+---
+title: Authentication
+description: Authenticate Partner API requests using API keys.
+---
+
+## API Key Types
+
+All Partner API requests require an API key passed as a Bearer token:
+
+```
+Authorization: Bearer sk_personal_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+There are two key types:
+
+| Type | Prefix | Created by | Scope |
+|------|--------|-----------|-------|
+| **Personal** | `sk_personal_` | Any staff panel user | That user's assigned exchanges and permissions |
+| **Branch** | `sk_branch_` | Superadmin only | All exchanges in the branch |
+
+## Creating API Keys
+
+API keys are managed via the staff panel **or** via the management API (requires JWT session):
+
+```bash
+# Create a personal key (any panel user)
+curl -X POST https://api.example.com/api/v1/api-keys \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My CRM","type":"personal"}'
+
+# Create a branch key (superadmin only)
+curl -X POST https://api.example.com/api/v1/api-keys \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Branch Integration","type":"branch","branchId":1}'
+```
+
+The response includes the raw key exactly once:
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "keyPrefix": "sk_personal_Ab3xQw",
+  "name": "My CRM",
+  "type": "personal",
+  "isActive": true,
+  "rawKey": "sk_personal_Ab3xQw...",
+  "note": "Store this key securely — it will not be shown again."
+}
+```
+
+<Warning>
+  Save the `rawKey` value immediately. It is hashed and stored server-side and **cannot be retrieved again**.
+</Warning>
+
+## Key Expiry
+
+Pass `expiresAt` (ISO 8601) to create a key with an expiry date:
+
+```json
+{ "name": "Temp key", "type": "personal", "expiresAt": "2026-12-31T23:59:59Z" }
+```
+
+Expired keys return `401 Unauthorized`.
+
+## Revoking Keys
+
+```bash
+curl -X DELETE https://api.example.com/api/v1/api-keys/<id> \
+  -H "Authorization: Bearer <JWT>"
+```
+
+## Multi-Tenancy Guarantee
+
+A personal key resolves to the creating user. All order/client queries are automatically scoped to that user's permitted exchanges — a key from Branch X **cannot** access Branch Y data.
+
+A branch key resolves to a branch-level principal that spans all exchanges within that branch.

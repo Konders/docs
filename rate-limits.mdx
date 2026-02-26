@@ -1,0 +1,63 @@
+---
+title: Rate Limits
+description: Understand the Partner API rate limits and how to handle 429 responses.
+---
+
+## Default Limits
+
+| Dimension | Default | Configurable via |
+|-----------|---------|-----------------|
+| Requests per minute | **60** | `PARTNER_API_RATE_LIMIT` env |
+| Window duration | **60 seconds** | `PARTNER_API_RATE_LIMIT_TTL` env |
+
+Rate limiting is keyed **per API key** — each key gets its own independent bucket. One key's traffic does not affect another's.
+
+## Response Headers
+
+Every Partner API response includes rate limit headers:
+
+```
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 47
+```
+
+## 429 Too Many Requests
+
+When you exceed the limit:
+
+```json
+{
+  "statusCode": 429,
+  "message": "Rate limit exceeded",
+  "retryAfter": 23
+}
+```
+
+The `retryAfter` field is the number of seconds until the window resets.
+
+## Best Practices
+
+- Cache exchange rate responses locally (rates update at most every few seconds).
+- Use exponential backoff when you receive a `429`.
+- If you need higher limits, contact support — limits can be raised per-key.
+
+## Example: Respecting the Limit
+
+```typescript
+async function fetchWithRetry(url: string, key: string, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+
+    if (res.status === 429) {
+      const { retryAfter } = await res.json();
+      await new Promise(r => setTimeout(r, retryAfter * 1000));
+      continue;
+    }
+
+    return res.json();
+  }
+  throw new Error('Rate limit exceeded after retries');
+}
+```

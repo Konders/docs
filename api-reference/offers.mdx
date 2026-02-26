@@ -1,0 +1,45 @@
+---
+title: Offers (Rates)
+description: Query available currency exchange rates.
+---
+
+## List Offers
+
+Returns paginated exchange rate offers available to clients.
+
+```bash
+GET /api/v1/partner/offers
+Authorization: Bearer sk_personal_YOUR_KEY
+```
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `page` | integer | Page number (default: 1) |
+| `limit` | integer | Items per page (default: 25, max: 100) |
+| `filters` | string | JSON-encoded TypeORM filters |
+| `sort` | string | JSON-encoded sort array |
+
+### Example — Filter by currency pair
+
+```bash
+GET /api/v1/partner/offers?filters={"currencySource":{"ticker":"USD"}}
+```
+
+### Response
+
+```json
+{
+  "data": [
+    {
+      "id": 42,
+      "rate": "38.5",
+      "currencySource": { "id": 1, "ticker": "USD", "name": "US Dollar" },
+      "currencyDest": { "id": 2, "ticker": "UAH", "name": "Ukrainian Hryvnia" },
+      "paymentMethods": [...]
+    }
+  ],
+  "hasNextPage": false
+}
+```

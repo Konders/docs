@@ -1,0 +1,61 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Exchange Partner API",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#2563EB",
+    "light": "#60A5FA",
+    "dark": "#1D4ED8"
+  },
+  "topbarLinks": [
+    {
+      "name": "Support",
+      "url": "mailto:support@example.com"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Dashboard",
+    "url": "https://app.example.com"
+  },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    }
+  ],
+  "anchors": [],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "authentication",
+        "rate-limits",
+        "errors"
+      ]
+    },
+    {
+      "group": "Webhooks",
+      "pages": [
+        "webhooks"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/exchanges",
+        "api-reference/offers",
+        "api-reference/orders",
+        "api-reference/clients",
+        "api-reference/webhooks-api",
+        "api-reference/api-keys-api"
+      ]
+    }
+  ],
+  "openapi": "openapi.json",
+  "footerSocials": {}
+}

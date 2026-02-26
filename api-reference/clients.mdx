@@ -1,0 +1,65 @@
+---
+title: Clients
+description: Register and manage exchange clients programmatically.
+---
+
+## Register a Client
+
+Creates a new client account. Use this to pre-register users coming from your CRM or Telegram bot before they place their first order.
+
+```bash
+POST /api/v1/partner/clients
+Authorization: Bearer sk_personal_YOUR_KEY
+Content-Type: application/json
+```
+
+### Request Body
+
+```json
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "phoneNumber": "+380501234567",
+  "email": "john@example.com",
+  "tgID": "123456789",
+  "tgNickName": "@JohnDoe"
+}
+```
+
+All fields are optional except `firstName`. Phone numbers and emails must be unique.
+
+### Response
+
+Returns the created user object with `id`.
+
+---
+
+## Get Client by ID
+
+```bash
+GET /api/v1/partner/clients/:id
+Authorization: Bearer sk_personal_YOUR_KEY
+```
+
+Returns the client profile. Returns `404` if not found.
+
+---
+
+## Update Client
+
+```bash
+PATCH /api/v1/partner/clients/:id
+Authorization: Bearer sk_personal_YOUR_KEY
+Content-Type: application/json
+```
+
+### Request Body
+
+Partial update — only include fields you want to change:
+
+```json
+{
+  "firstName": "Johnny",
+  "phoneNumber": "+380509999999"
+}
+```
