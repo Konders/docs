@@ -3,7 +3,7 @@
   "info": {
     "title": "Exchange Partner API",
     "version": "1.0.0",
-    "description": "REST API for exchange office partners. Authenticate with a Bearer API key (`sk_branch_*` or `sk_personal_*`). API key management endpoints use JWT Bearer auth from the staff panel."
+    "description": "REST API for exchange office partners. Authenticate with a Bearer API key (`sk_branch_*`, `sk_personal_*`, or `pk_*`). API key management endpoints use JWT Bearer auth from the staff panel."
   },
   "servers": [
     {
@@ -15,6 +15,7 @@
     { "bearerAuth": [] }
   ],
   "tags": [
+    { "name": "Partner — Public", "description": "Read-only endpoints accessible with any key type (including pk_* public keys)" },
     { "name": "Partner — Exchanges", "description": "Read public exchange office data and rates" },
     { "name": "Partner — Offers", "description": "Browse available currency exchange rate offers" },
     { "name": "Partner — Orders", "description": "Create and manage client exchange orders" },
@@ -27,7 +28,7 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Partner API key. Format: `sk_branch_<32chars>` or `sk_personal_<32chars>`"
+        "description": "Partner API key. Format: `sk_branch_<32chars>`, `sk_personal_<32chars>`, or `pk_<32chars>` (public, read-only)"
       },
       "jwtAuth": {
         "type": "http",
@@ -66,6 +67,87 @@
           "id": { "type": "integer", "example": 1 }
         },
         "required": ["id"]
+      },
+      "PublicCurrency": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "name": { "type": "string", "example": "US Dollar" },
+          "ticker": { "type": "string", "example": "USD" },
+          "image": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": { "type": "string", "example": "cbcfa8b8-3a25-4adb-a9c6-e325f0d0f3ae" },
+              "path": { "type": "string", "example": "/uploads/usd.png" }
+            }
+          }
+        }
+      },
+      "PublicExchange": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "name": { "type": "string", "example": "Main Office" },
+          "exchangeActive": { "type": "boolean", "example": true },
+          "contacts": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "address": { "type": "string", "nullable": true, "example": "123 Currency St" },
+              "phoneNumber": { "type": "string", "nullable": true, "example": "+380671234567" },
+              "chat": { "type": "string", "nullable": true, "example": "https://t.me/example" },
+              "location": { "type": "object", "nullable": true }
+            }
+          },
+          "schedule": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dayOfWeek": { "type": "integer", "example": 1 },
+                "openTime": { "type": "string", "nullable": true, "example": "09:00" },
+                "closeTime": { "type": "string", "nullable": true, "example": "18:00" },
+                "isClosed": { "type": "boolean", "example": false }
+              }
+            }
+          }
+        }
+      },
+      "PublicRate": {
+        "type": "object",
+        "properties": {
+          "offerId": { "type": "integer", "example": 42 },
+          "currencySource": { "$ref": "#/components/schemas/PublicCurrency" },
+          "currencyDest": { "$ref": "#/components/schemas/PublicCurrency" },
+          "sale": { "type": "number", "description": "Sale rate (exchange sells to client)", "example": 41.5 },
+          "buy": { "type": "number", "description": "Buy rate (exchange buys from client)", "example": 41.3 },
+          "exchangeId": { "type": "integer", "example": 1 }
+        }
+      },
+      "EstimateRequest": {
+        "type": "object",
+        "required": ["exchangeId", "sourceCurrencyId", "destCurrencyId", "amount", "direction"],
+        "properties": {
+          "exchangeId": { "type": "integer", "description": "Exchange office ID", "example": 1 },
+          "sourceCurrencyId": { "type": "integer", "description": "Source currency ID", "example": 1 },
+          "destCurrencyId": { "type": "integer", "description": "Destination currency ID", "example": 2 },
+          "amount": { "type": "number", "description": "Amount to convert", "example": 1000 },
+          "direction": { "type": "string", "enum": ["source", "dest"], "description": "Whether amount is in source or destination currency", "example": "source" }
+        }
+      },
+      "EstimateResponse": {
+        "type": "object",
+        "properties": {
+          "sourceAmount": { "type": "number", "example": 1000 },
+          "destAmount": { "type": "number", "example": 41500 },
+          "rate": { "type": "number", "example": 41.5 },
+          "isReverse": { "type": "boolean", "description": "Whether the offer was matched in reverse direction", "example": false },
+          "sourceCurrency": { "$ref": "#/components/schemas/PublicCurrency" },
+          "destCurrency": { "$ref": "#/components/schemas/PublicCurrency" },
+          "exchangeId": { "type": "integer", "example": 1 },
+          "offerId": { "type": "integer", "example": 42 }
+        }
       },
       "Exchange": {
         "type": "object",
@@ -287,8 +369,8 @@
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "name": { "type": "string", "example": "My CRM Integration" },
-          "type": { "type": "string", "enum": ["branch", "personal"] },
-          "keyPrefix": { "type": "string", "example": "sk_personal_Ab3x", "description": "First 16 chars of the key, for display" },
+          "type": { "type": "string", "enum": ["branch", "personal", "public"] },
+          "keyPrefix": { "type": "string", "example": "sk_personal_Ab3x", "description": "First 20 chars of the key, for display" },
           "isActive": { "type": "boolean", "example": true },
           "lastUsedAt": { "type": "string", "format": "date-time", "nullable": true },
           "expiresAt": { "type": "string", "format": "date-time", "nullable": true },
@@ -301,10 +383,10 @@
         "required": ["name", "type"],
         "properties": {
           "name": { "type": "string", "maxLength": 100, "example": "My CRM Integration" },
-          "type": { "type": "string", "enum": ["branch", "personal"], "default": "personal" },
+          "type": { "type": "string", "enum": ["branch", "personal", "public"], "default": "personal" },
           "branchId": {
             "type": "integer",
-            "description": "Required when type=branch",
+            "description": "Required when type=branch or type=public",
             "example": 1
           },
           "expiresAt": {
@@ -401,6 +483,126 @@
     }
   },
   "paths": {
+    "/partner/public/exchanges": {
+      "get": {
+        "tags": ["Partner — Public"],
+        "summary": "List exchange offices in the branch",
+        "description": "Returns all exchange offices belonging to the API key's branch, including contacts and schedules. Accessible with any key type (pk_, sk_branch_, sk_personal_).",
+        "operationId": "publicListExchanges",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of exchange offices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/PublicExchange" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/partner/public/currencies": {
+      "get": {
+        "tags": ["Partner — Public"],
+        "summary": "List currencies available in the branch",
+        "description": "Returns all distinct currencies from active offers across the branch's exchanges.",
+        "operationId": "publicListCurrencies",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of currencies",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/PublicCurrency" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/partner/public/rates": {
+      "get": {
+        "tags": ["Partner — Public"],
+        "summary": "List exchange rates in the branch",
+        "description": "Returns exchange rates (sale/buy) for active offers in the branch. Optionally filter by exchange ID.",
+        "operationId": "publicListRates",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "exchangeId",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer" },
+            "description": "Filter rates by exchange ID",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of exchange rates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/PublicRate" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/partner/public/estimate": {
+      "post": {
+        "tags": ["Partner — Public"],
+        "summary": "Estimate exchange amount for a currency pair",
+        "description": "Calculates the estimated source or destination amount for a given currency pair and exchange. Uses the same rate logic as order creation.",
+        "operationId": "publicEstimate",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EstimateRequest" },
+              "example": {
+                "exchangeId": 1,
+                "sourceCurrencyId": 1,
+                "destCurrencyId": 2,
+                "amount": 1000,
+                "direction": "source"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Estimation result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EstimateResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
     "/partner/exchanges": {
       "get": {
         "tags": ["Partner — Exchanges"],

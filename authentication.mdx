@@ -11,12 +11,29 @@ All Partner API requests require an API key passed as a Bearer token:
 Authorization: Bearer sk_personal_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-There are two key types:
+There are three key types:
 
 | Type | Prefix | Created by | Scope |
 |------|--------|-----------|-------|
 | **Personal** | `sk_personal_` | Any staff panel user | That user's assigned exchanges and permissions |
 | **Branch** | `sk_branch_` | Superadmin only | All exchanges in the branch |
+| **Public** | `pk_` | Superadmin only | Read-only access to a branch's public data |
+
+### Secret vs Public Keys
+
+**Secret keys** (`sk_personal_*`, `sk_branch_*`) have full read/write access — they can create orders, register clients, and manage webhooks.
+
+**Public keys** (`pk_*`) are read-only and can only access the **Public** endpoints:
+- `GET /partner/public/exchanges`
+- `GET /partner/public/currencies`
+- `GET /partner/public/rates`
+- `POST /partner/public/estimate`
+
+Public keys are designed for embedding in client-facing applications (e.g., landing pages, rate widgets) where you want to display exchange rates without exposing write access. If a `pk_*` key is used on a write endpoint, the API returns `403 Forbidden`.
+
+<Note>
+  Secret keys (`sk_*`) can also access all public endpoints — you don't need a separate public key if you already have a secret key.
+</Note>
 
 ## Creating API Keys
 
@@ -34,6 +51,12 @@ curl -X POST https://api.example.com/api/v1/api-keys \
   -H "Authorization: Bearer <JWT>" \
   -H "Content-Type: application/json" \
   -d '{"name":"Branch Integration","type":"branch","branchId":1}'
+
+# Create a public key (superadmin only)
+curl -X POST https://api.example.com/api/v1/api-keys \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Rate Widget","type":"public","branchId":1}'
 ```
 
 The response includes the raw key exactly once:
@@ -76,3 +99,5 @@ curl -X DELETE https://api.example.com/api/v1/api-keys/<id> \
 A personal key resolves to the creating user. All order/client queries are automatically scoped to that user's permitted exchanges — a key from Branch X **cannot** access Branch Y data.
 
 A branch key resolves to a branch-level principal that spans all exchanges within that branch.
+
+A public key resolves to a read-only branch-level principal — it can view exchange data within its branch but cannot create or modify any resources.

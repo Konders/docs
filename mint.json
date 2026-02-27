@@ -1,15 +1,29 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "Exchange Partner API",
+  "name": "Miex Solutions API",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
   },
   "favicon": "/favicon.svg",
   "colors": {
-    "primary": "#2563EB",
-    "light": "#60A5FA",
-    "dark": "#1D4ED8"
+    "primary": "#05D533",
+    "light": "#42D80A",
+    "dark": "#039855",
+    "background": {
+      "light": "#FDFDFD",
+      "dark": "#010101"
+    }
+  },
+  "font": {
+    "headings": {
+      "family": "Inter",
+      "weight": 700
+    },
+    "body": {
+      "family": "Inter",
+      "weight": 400
+    }
   },
   "topbarLinks": [
     {
@@ -47,12 +61,63 @@
     {
       "group": "API Reference",
       "pages": [
-        "api-reference/exchanges",
-        "api-reference/offers",
-        "api-reference/orders",
-        "api-reference/clients",
-        "api-reference/webhooks-api",
-        "api-reference/api-keys-api"
+        {
+          "group": "Public",
+          "pages": [
+            "api-reference/public-list-exchanges",
+            "api-reference/public-list-currencies",
+            "api-reference/public-list-rates",
+            "api-reference/public-estimate"
+          ]
+        },
+        {
+          "group": "Exchanges",
+          "pages": [
+            "api-reference/list-exchanges",
+            "api-reference/get-exchange"
+          ]
+        },
+        {
+          "group": "Offers",
+          "pages": [
+            "api-reference/list-offers"
+          ]
+        },
+        {
+          "group": "Orders",
+          "pages": [
+            "api-reference/create-order",
+            "api-reference/list-orders",
+            "api-reference/get-order",
+            "api-reference/get-order-by-hash",
+            "api-reference/cancel-order"
+          ]
+        },
+        {
+          "group": "Clients",
+          "pages": [
+            "api-reference/create-client",
+            "api-reference/get-client",
+            "api-reference/update-client"
+          ]
+        },
+        {
+          "group": "Webhooks",
+          "pages": [
+            "api-reference/create-webhook",
+            "api-reference/list-webhooks",
+            "api-reference/delete-webhook"
+          ]
+        },
+        {
+          "group": "API Keys",
+          "pages": [
+            "api-reference/create-api-key",
+            "api-reference/list-api-keys",
+            "api-reference/update-api-key",
+            "api-reference/revoke-api-key"
+          ]
+        }
       ]
     }
   ],
